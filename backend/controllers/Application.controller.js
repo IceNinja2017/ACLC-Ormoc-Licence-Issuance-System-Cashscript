@@ -2,8 +2,16 @@ import Application from "../models/Application.model.js";
 
 export const createApplication = async (req, res) => {
   try {
-    const { applicant } = req.params;
-    const { licenseType } = req.body;
+    const { applicant } = req.params; // or req.user.id if using auth
+
+    const {
+      licenseType,
+      fullName,
+      birthDate,
+      address,
+      contactNumber,
+      details,
+    } = req.body;
 
     // Check if applicant already has a pending application
     const existingApplication = await Application.findOne({
@@ -21,6 +29,11 @@ export const createApplication = async (req, res) => {
     const application = await Application.create({
       applicant,
       licenseType,
+      fullName,
+      birthDate,
+      address,
+      contactNumber,
+      details,
     });
 
     res.status(201).json({
@@ -36,10 +49,6 @@ export const createApplication = async (req, res) => {
   }
 };
 
-/**
- * @desc Get all applications
- * @route GET /api/applications
- */
 export const getAllApplications = async (req, res) => {
   try {
     const applications = await Application.find()
@@ -58,10 +67,6 @@ export const getAllApplications = async (req, res) => {
   }
 };
 
-/**
- * @desc Get application by ID
- * @route GET /api/applications/:id
- */
 export const getApplicationById = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id)
@@ -86,10 +91,6 @@ export const getApplicationById = async (req, res) => {
   }
 };
 
-/**
- * @desc Approve an application
- * @route PUT /api/applications/:id/approve
- */
 export const approveApplication = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id);
@@ -119,10 +120,6 @@ export const approveApplication = async (req, res) => {
   }
 };
 
-/**
- * @desc Reject an application
- * @route PUT /api/applications/:id/reject
- */
 export const rejectApplication = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id);
@@ -152,10 +149,63 @@ export const rejectApplication = async (req, res) => {
   }
 };
 
-/**
- * @desc Delete an application
- * @route DELETE /api/applications/:id
- */
+//add paid status update here, only update if the application is approved and payment is successful
+export const updatePaymentStatus = async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found.",
+      });
+    }
+
+    // Only update payment status if the application is approved
+    if (application.status !== "APPROVED") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment status can only be updated for approved applications.",
+      });
+    }
+
+    application.paymentStatus = req.body.paymentStatus;
+    await application.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Payment status updated.",
+      data: application,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//add get paid applications by user id here
+export const getPaidApplicationsByUserId = async (req, res) => {
+  try {
+    const applications = await Application.find({
+      applicant: req.params.userId,
+      paymentStatus: "PAID"
+    }).populate("applicant", "name email walletAddress");
+
+    res.status(200).json({
+      success: true,
+      count: applications.length,
+      data: applications,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 export const deleteApplication = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id);

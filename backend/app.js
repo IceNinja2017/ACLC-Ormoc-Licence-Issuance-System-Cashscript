@@ -5,6 +5,7 @@ import mongoose, { get } from "mongoose";
 import userRoutes from "./routes/User.route.js"
 import activityRoutes from "./routes/ActivityLog.route.js"
 import licenseRoutes from "./routes/License.route.js"
+import applicationRoutes from "./routes/Application.route.js"
 import cors from "cors";
 import dns from 'node:dns';
 
@@ -26,6 +27,7 @@ app.use(cookieParser()); // parse cookies
 app.use("/api/user/", userRoutes)
 app.use("/api/activity/", activityRoutes)
 app.use("/api/license/", licenseRoutes)
+app.use("/api/application/", applicationRoutes)
 
 app.listen(PORT, () =>{
     connectDB(mongoose);
