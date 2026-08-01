@@ -6,7 +6,9 @@ import userRoutes from "./routes/User.route.js"
 import activityRoutes from "./routes/ActivityLog.route.js"
 import licenseRoutes from "./routes/License.route.js"
 import cors from "cors";
+import dns from 'node:dns';
 
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 const app = express();
 const PORT = process.env.AuthenticationService_PORT || 5000;
 
