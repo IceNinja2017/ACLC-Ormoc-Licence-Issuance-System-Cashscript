@@ -64,6 +64,28 @@ export default function Applications() {
     navigate("/", { replace: true });
   }
 
+  function getStatusStyle(status) {
+  switch (status) {
+    case "APPROVED":
+      return "bg-green-400/20 text-green-300";
+
+    case "PENDING":
+      return "bg-blue-400/20 text-blue-300";
+
+    case "REJECTED":
+      return "bg-red-400/20 text-red-300";
+
+    case "PAID":
+      return "bg-purple-400/20 text-purple-300";
+
+    case "MINTED":
+      return "bg-emerald-400/20 text-emerald-300";
+
+    default:
+      return "bg-gray-400/20 text-gray-300";
+  }
+}
+
 
   return (
     <main>
@@ -246,15 +268,14 @@ export default function Applications() {
                 <td className="px-6 py-4">
 
                 <span
-                    className="
-                    rounded-full
-                    bg-yellow-400/20
-                    px-3
-                    py-1
-                    text-xs
-                    font-semibold
-                    text-yellow-300
-                    "
+                    className={`
+                        rounded-full
+                        px-3
+                        py-1
+                        text-xs
+                        font-semibold
+                        ${getStatusStyle(app.status)}
+                    `}
                 >
                     {app.status}
                 </span>

@@ -7,6 +7,7 @@ import {
   rejectApplication,
   deleteApplication,
 } from "../controllers/Application.controller.js";
+import { mintApplicationNFT } from "../controllers/Nft.controller.js";
 
 const router = express.Router();
 
@@ -27,5 +28,10 @@ router.put("/:id/reject", rejectApplication);
 
 // Delete an application
 router.delete("/:id", deleteApplication);
+
+router.post(
+ "/:id/mint",
+ mintApplicationNFT
+);
 
 export default router;

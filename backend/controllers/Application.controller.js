@@ -1,4 +1,5 @@
 import Application from "../models/Application.model.js";
+import { verifyBCHTransaction } from "../utils/verifyBCHTransaction.js";
 
 export const createApplication = async (req, res) => {
   try {
@@ -70,56 +71,96 @@ export const getAllApplications = async (req, res) => {
 };
 
 export const getApplicationById = async (req, res) => {
-  try {
-    const application = await Application.findById(req.params.id)
-      .populate("applicant", "name email walletAddress");
+try {
 
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Application not found.",
-      });
-    }
+const application = await Application.findById(req.params.id)
+.populate("applicant", "name email walletAddress");
 
-    res.status(200).json({
-      success: true,
-      data: application,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
+
+if (!application) {
+  return res.status(404).json({
+    success:false,
+    message:"Application not found.",
+  });
+}
+
+
+res.status(200).json({
+  success:true,
+  data: application,
+});
+
+
+} catch(error){
+
+res.status(500).json({
+  success:false,
+  message:error.message,
+});
+
+}
+
 };
 
 export const approveApplication = async (req, res) => {
-  try {
-    const application = await Application.findById(req.params.id);
+try {
+const LICENSE_FEES = {
+  DRIVER: {
+    NEW: 0.00001,
+    RENEWAL: 0.000005,
+  },
 
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Application not found.",
-      });
-    }
+  PRC: {
+    NEW: 0.00002,
+    RENEWAL: 0.00001,
+  },
 
-    application.status = "APPROVED";
-    application.remarks = req.body.remarks || "";
+  BUSINESS: {
+    NEW: 0.00005,
+    RENEWAL: 0.00003,
+  },
+};
+const application = await Application.findById(req.params.id);
 
-    await application.save();
+if (!application) {
+  return res.status(404).json({
+    success: false,
+    message: "Application not found.",
+  });
+}
 
-    res.status(200).json({
-      success: true,
-      message: "Application approved.",
-      data: application,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
+
+application.status = "APPROVED";
+
+
+application.payment = {
+  amount: LICENSE_FEES[application.licenseType][application.applicationType],
+  address: process.env.BCH_PAYMENT_ADDRESS,
+};
+
+
+application.remarks = req.body.remarks || "";
+
+
+await application.save();
+
+
+res.status(200).json({
+  success: true,
+  message: "Application approved.",
+  data: application,
+});
+
+
+} catch (error) {
+
+res.status(500).json({
+  success: false,
+  message: error.message,
+});
+
+}
+
 };
 
 export const rejectApplication = async (req, res) => {
@@ -151,40 +192,73 @@ export const rejectApplication = async (req, res) => {
   }
 };
 
-//add paid status update here, only update if the application is approved and payment is successful
 export const updatePaymentStatus = async (req, res) => {
-  try {
-    const application = await Application.findById(req.params.id);
+try {
 
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Application not found.",
-      });
-    }
+const application = await Application.findById(req.params.id);
 
-    // Only update payment status if the application is approved
-    if (application.status !== "APPROVED") {
-      return res.status(400).json({
-        success: false,
-        message: "Payment status can only be updated for approved applications.",
-      });
-    }
 
-    application.paymentStatus = req.body.paymentStatus;
-    await application.save();
+if (!application) {
+  return res.status(404).json({
+    success:false,
+    message:"Application not found.",
+  });
+}
 
-    res.status(200).json({
-      success: true,
-      message: "Payment status updated.",
-      data: application,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
+
+if (application.status !== "APPROVED") {
+  return res.status(400).json({
+    success:false,
+    message:"Application is not approved.",
+  });
+}
+
+
+const { transactionId } = req.body;
+
+
+const isValid =
+  await verifyBCHTransaction({
+    transactionId,
+    expectedAddress: application.payment.address,
+    expectedAmount: application.payment.amount,
+  });
+
+
+if (!isValid) {
+  return res.status(400).json({
+    success:false,
+    message:"Invalid BCH transaction.",
+  });
+}
+
+
+application.payment.transactionId = transactionId;
+
+application.paymentStatus = "PAID";
+
+application.payment.verifiedAt = new Date();
+
+
+await application.save();
+
+
+res.status(200).json({
+  success:true,
+  message:"Payment verified.",
+  data:application,
+});
+
+
+} catch(error){
+
+res.status(500).json({
+ success:false,
+ message:error.message,
+});
+
+}
+
 };
 
 //add get paid applications by user id here

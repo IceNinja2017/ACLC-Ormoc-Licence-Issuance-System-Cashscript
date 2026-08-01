@@ -1,9 +1,33 @@
+import { useNavigate } from "react-router-dom";
+
 export default function ApplicationModal({
   application,
   onClose,
 }) {
-  if (!application) return null;
+  const navigate = useNavigate();
 
+  if (!application) return null;
+    function getStatusStyle(status) {
+  switch (status) {
+    case "APPROVED":
+      return "bg-green-400/20 text-green-300";
+
+    case "PENDING":
+      return "bg-blue-400/20 text-blue-300";
+
+    case "REJECTED":
+      return "bg-red-400/20 text-red-300";
+
+    case "PAID":
+      return "bg-purple-400/20 text-purple-300";
+
+    case "MINTED":
+      return "bg-emerald-400/20 text-emerald-300";
+
+    default:
+      return "bg-gray-400/20 text-gray-300";
+  }
+}
 
   return (
     <div
@@ -120,20 +144,18 @@ export default function ApplicationModal({
           </div>
 
 
-          <span
-            className="
-              rounded-full
-              bg-yellow-500/20
-              px-4
-              py-1.5
-              text-sm
-              font-semibold
-              text-yellow-300
-            "
-          >
-            {application.status}
-            
-          </span>
+<span
+  className={`
+    rounded-full
+    px-4
+    py-1.5
+    text-sm
+    font-semibold
+    ${getStatusStyle(application.status)}
+  `}
+>
+  {application.status}
+</span>
 
         </div>
 
@@ -296,22 +318,23 @@ export default function ApplicationModal({
       </div>
 
 
-      <button
-        className="
-          rounded-lg
-          bg-green-500
-          px-5
-          py-2
-          font-semibold
-          text-black
-          hover:bg-green-400
-        "
-        onClick={() => {
-          console.log("Pay:", application._id);
-        }}
-      >
-        Pay Now
-      </button>
+<button
+  className="
+    rounded-lg
+    bg-green-500
+    px-5
+    py-2
+    font-semibold
+    text-black
+    transition
+    hover:bg-green-400
+  "
+  onClick={() => {
+    navigate(`/payment/${application._id}`);
+  }}
+>
+  Pay Now
+</button>
 
     </div>
   </div>

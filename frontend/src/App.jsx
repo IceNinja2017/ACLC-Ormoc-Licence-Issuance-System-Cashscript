@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/DashboardPage";
 import Applications from "./pages/ApplicationsPage";
+import PaymentPage from "./pages/PaymentPage";
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       <Route path="/" element={<AuthPage />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/applications" element={<Applications />} />
+      <Route path="/payment/:id" element={<PaymentPage />} />
     </Routes>
   );
 }
