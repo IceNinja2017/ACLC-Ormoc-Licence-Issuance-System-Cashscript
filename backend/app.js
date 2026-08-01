@@ -1,29 +1,26 @@
 import express from "express";
-import dotenv from "dotenv";
-import mongoose from "mongoose";
+import cookieParser from "cookie-parser";
+import { connectDB } from "./config/db.js";
+import mongoose, { get } from "mongoose";
+import authRoutes from "./routes/route.js"
 import cors from "cors";
-import bodyParser from "body-parser";
-import routes from "./routes/index.js";
-
-dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
-app.use(routes);
+const PORT = process.env.AuthenticationService_PORT || 5000;
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
+app.listen(PORT, () =>{
+    connectDB(mongoose);
+    console.log("Server started at http://localhost:" + PORT);
 });
 
-const db = mongoose.connection;
-db.on("error", console.error.bind(console, "MongoDB connection error:"));
-db.once("open", () => {
-  console.log("Connected to MongoDB");
-});
+//app.set("trust proxy", 1);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+app.use(cors({
+    origin: process.env.FRONTEND_BASE_URL,
+    credentials: true,
+}));
+
+app.use(express.json()); // parse incoming JSON request
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // parse cookies
+app.use("/api/auth", authRoutes);
