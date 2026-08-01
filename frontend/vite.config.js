@@ -16,4 +16,9 @@ export default defineConfig({
   optimizeDeps: {
     esbuildOptions: { target: 'esnext' },
   },
+  server: {
+    proxy: {
+      '/api': 'http://localhost:5000',
+    },
+  },
 })

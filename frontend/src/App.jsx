@@ -6,12 +6,19 @@ import { decodeLicenseCommitment, encodeLicenseCommitment, licenseTypeCode, rand
 import { verifyDemoLicense } from './lib/verify';
 import { bootstrapMocknet, createMockIdentity, mockTransaction, ownerHash, verifyMockLicense } from './lib/mocknet';
 import { createPersistedLicense, loadPersistedLicenses, updatePersistedLicense } from './lib/licenseApi';
+import { logoutUser } from './lib/auth';
+import AuthPage from './pages/AuthPage';
 
 const STORAGE_KEY = 'proofpass-demo-licenses-v1';
+const USER_STORAGE_KEY = 'proofpass-user-session-v1';
 const INITIAL_LICENSES = [{ id: 'PP-84291', holderName: 'Alice Santos', holderAddress: 'mock:holder-alice-demo', licenseType: 'Professional License', expiresAt: '2027-08-01T00:00:00.000Z', status: 'Valid', commitment: 'demo-commitment-84291' }];
 
 function readLicenses() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? INITIAL_LICENSES; } catch { return INITIAL_LICENSES; }
+}
+
+function readSavedUser() {
+  try { return JSON.parse(localStorage.getItem(USER_STORAGE_KEY)); } catch { return null; }
 }
 
 export default function App() {
@@ -21,8 +28,14 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState('demo');
   const [mocknet, setMocknet] = useState({ issuer: null, holder: null, category: '', contractAddress: '' });
+  const [user, setUser] = useState(readSavedUser);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses)), [licenses]);
+  useEffect(() => {
+    if (user) localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    else localStorage.removeItem(USER_STORAGE_KEY);
+  }, [user]);
   useEffect(() => {
     let cancelled = false;
     loadPersistedLicenses().then((persisted) => {
@@ -106,8 +119,21 @@ export default function App() {
     setNotice(`Mock authority created at ${bootstrapped.contractAddress}; bootstrap tx ${bootstrapped.txid.slice(0, 14)}…`);
   }); }
   function resetDemo() { localStorage.removeItem(STORAGE_KEY); setLicenses(INITIAL_LICENSES); setResult(null); setNotice('Demo data restored.'); }
+  function authenticated(nextUser, message) { setUser(nextUser); setNotice(message || `Signed in as ${nextUser.username}.`); setShowDashboard(true); }
+  function loggedOut(message) { setUser(null); setNotice(message || 'You have been signed out.'); setShowDashboard(false); }
+  function exploreDemo() { setUser(null); setNotice('Demo registry ready — no account required.'); setShowDashboard(true); }
+  async function signOut() {
+    try {
+      const payload = await logoutUser();
+      loggedOut(payload.message);
+    } catch (error) {
+      setNotice(error.message || 'Unable to sign out.');
+    }
+  }
 
-  return <main><nav><a className="brand" href="#top"><span>⌁</span>ProofPass</a><div className="nav-center"><a href="#issuer">Issuer</a><a href="#holder">Holder</a><a href="#verify">Verify</a></div><button className="mode" onClick={() => setMode(mode === 'demo' ? 'mocknet' : 'demo')}><i className={mode} />{mode === 'demo' ? 'Demo mode' : 'Mocknet setup'}</button></nav>
+  if (!showDashboard) return <AuthPage onAuthenticated={authenticated} onExploreDemo={exploreDemo} />;
+
+  return <main><nav><a className="brand" href="#top"><span>⌁</span>ProofPass</a><div className="nav-center"><a href="#issuer">Issuer</a><a href="#holder">Holder</a><a href="#verify">Verify</a></div><div className="nav-actions"><button className="quiet nav-auth" type="button" onClick={user ? signOut : () => setShowDashboard(false)}>{user ? 'Sign out' : 'Sign in'}</button><button className="mode" onClick={() => setMode(mode === 'demo' ? 'mocknet' : 'demo')}><i className={mode} />{mode === 'demo' ? 'Demo mode' : 'Mocknet setup'}</button></div></nav>
     <header id="top" className="hero"><div><p className="eyebrow">CASH TOKENS × CASHSCRIPT</p><h1>Licenses that <em>belong</em><br />to one person.</h1><p className="lede">A non-transferable credential prototype. Build and test its complete lifecycle locally before connecting to a blockchain.</p><div className="hero-actions"><a className="primary" href="#issuer">Explore the flow <span>↓</span></a><button className="quiet" onClick={resetDemo}>Reset demo</button></div></div><div className="hero-art"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="nft-core">⌁<small>SOULBOUND<br />ON BCH</small></div><span className="float-chip chip-a">NFT</span><span className="float-chip chip-b">✓ VALID</span></div></header>
     <div className="notice"><span>●</span>{notice}</div>
     {mode === 'mocknet' && <section className="mocknet-callout"><strong>Mocknet setup — local development only.</strong><div className="wallet-setup"><div><span>Start with two local identities.</span><p>Mocknet has no private keys, test funds, Electrum server, or transaction broadcasts.</p></div><button className="quiet wallet-button" disabled={busy} onClick={() => generateMockIdentity('issuer')}>Create issuer identity</button><button className="quiet wallet-button" disabled={busy} onClick={() => generateMockIdentity('holder')}>Create holder identity</button></div>{Object.entries({ issuer: mocknet.issuer, holder: mocknet.holder }).filter(([, identity]) => identity).map(([role, identity]) => <div className="wallet-card" key={role}><div><b>{role} Mocknet identity</b><span>Use the holder identity below as the license recipient</span></div><code>{identity.address}</code></div>)}<div className="live-form"><input readOnly value={mocknet.category} placeholder="Mock CashToken category (bootstrap fills this)" /><input readOnly value={mocknet.contractAddress} placeholder="Mock covenant address (bootstrap fills this)" /><button className="secondary" disabled={busy} onClick={bootstrap}>Bootstrap mock authority</button></div><p>Copy the generated holder identity into the issuer form. Bootstrap creates a simulated token category and authority, then you can issue, renew, revoke, and verify licenses locally.</p></section>}
