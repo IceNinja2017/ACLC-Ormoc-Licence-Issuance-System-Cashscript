@@ -12,6 +12,6 @@ export default function VerifyPanel({ onVerify, result }) {
     {result && <div className={`verification ${result.status.toLowerCase()}`}><div className="verification-status"><span className="result-icon">{result.status === 'Valid' ? '✓' : '!'}</span><div><p>Verification result</p><h3>{result.status}</h3></div></div><p>{result.reason}</p>
       {license && <dl><div><dt>Owner</dt><dd>{license.holderName ?? license.holderPublicKeyHash}</dd></div><div><dt>License type</dt><dd>{license.licenseType}</dd></div><div><dt>Expiration</dt><dd>{expiryDate.toLocaleDateString()}</dd></div><div><dt>License ID</dt><dd>{license.id ?? `#${license.nonce}`}</dd></div></dl>}
     </div>}
-    {!result && <p className="helper">The verifier checks the covenant-held NFT, its expiry, revocation index, and optional claimed owner.</p>}
+    {!result && <p className="helper">Mocknet checks the simulated covenant record, expiry, revocation state, and optional claimed owner.</p>}
   </section>;
 }

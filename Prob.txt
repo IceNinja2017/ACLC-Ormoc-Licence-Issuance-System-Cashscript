@@ -1,0 +1,16 @@
+License issuance and renewal
+Problems;
+1. Forgery of fake license 
+2. Manual verification
+3. Centralized database
+4. slow renewal process
+5. Revocation Challenges
+
+obj;
+1. Issue Licenses as verifiable digital assets
+2. Allow anyone to veify a license's authenticity
+3. Enforce expiration and renewal rules
+4. allow authorized issuers to revoke licenses
+5. reduce fraud and manual verification
+
+
