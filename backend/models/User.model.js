@@ -27,11 +27,15 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["ADMIN", "USER"],
+      enum: ["ADMIN", "USER", "VERIFIER"],
       default: "USER",
     },
 
     walletAddress: {
+      type: String,
+      required: true,
+    },
+    tokenAddress: {
       type: String,
       required: true,
     },

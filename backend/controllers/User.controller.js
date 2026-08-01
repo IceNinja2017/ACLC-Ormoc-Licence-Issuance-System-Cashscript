@@ -1,19 +1,21 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { User } from "../models/User.model.js";
+import User from "../models/User.model.js";
 import { generateTokenAndSetCookie } from "../middleware/generateTokenAndSetCookie.js";
 import axios from "axios";
 import jwt from "jsonwebtoken";
 import env from "dotenv";
+import {convertToTokenAddress} from "../middleware/convertToTokenAddress.js";
+
 env.config();
 
 export const register = async (req, res) => {
     try {
-        const { username, email, password, address, walletAddress } = req.body;
+        const { username, email, password, address, walletAddress, role } = req.body;
 
         // required field checks
         if (!username || !email || !password || !address || walletAddress === undefined) {
-            return res.status(400).json({ message: "username, email, password, address, and walletAddress are required" });
+            return res.status(400).json({ message: "username, email, password, address, walletAddress are required" });
         }
 
         // Check duplicates
@@ -30,6 +32,11 @@ export const register = async (req, res) => {
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        
+        //Get TokenAddress from walletAddress
+        const converted = await convertToTokenAddress(walletAddress);
+        const tokenAddress = typeof converted === 'object' ? converted.address : converted;
+
         // Only create and save user after email succeeds
         const newUser = new User({
             username,
@@ -37,6 +44,7 @@ export const register = async (req, res) => {
             password: hashedPassword,
             address,
             walletAddress,
+            tokenAddress,
         });
 
         await newUser.save();
@@ -68,9 +76,17 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+        return res.status(400).json({
+            success: false,
+            message: "Email and password are required."
+        });
+    }
+
     try {
-        const user = await User.findOne({ email });
-        if(!user){
+        // Lowercase email check for case-insensitive logins
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid Credentials"
@@ -78,7 +94,7 @@ export const login = async (req, res) => {
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if(!isPasswordValid){
+        if (!isPasswordValid) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid Credentials"
@@ -90,25 +106,22 @@ export const login = async (req, res) => {
         user.lastLogin = new Date();
         await user.save();
 
-        res.status(200).json({
-                success: true,
-                message: "Logged in Sucessfully",
-                user: {
-                    ...user._doc,
-                    password: undefined,
-                    passwordResetToken: undefined,
-                    passwordResetExpiresAt: undefined,
-                    verificationToken: undefined,
-                    verificationTokenExpiresAt: undefined,
-                },
-            });
+        // Standardized sanitization
+        const userObj = user.toObject();
+        delete userObj.password;
+
+        return res.status(200).json({
+            success: true,
+            message: "Logged in successfully",
+            user: userObj
+        });
 
     } catch (error) {
-        console.log("Error in logging in", error);
-        res.status(400).json({
-                success: false,
-                message: error.message
-            });
+        console.error("Error in logging in:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
     }
 };
 

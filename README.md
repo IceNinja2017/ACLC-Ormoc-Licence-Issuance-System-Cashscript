@@ -1,4 +1,6 @@
-# ACLC-Ormoc License Issuance System
+# ProofPass: Mocknet License Prototype
+
+ProofPass is a beginner-friendly, browser-only prototype of professional licenses represented as soulbound NFTs. It models the CashToken and CashScript lifecycle locally, so the core product flow can be developed without wallets, private keys, test BCH, or a blockchain connection.
 
 ## Quick start
 
@@ -8,20 +10,32 @@ npm run compile
 npm run dev
 ```
 
-Open the printed local URL. Start in **Demo mode** to explore the full flow without a wallet. Turn on **Chipnet mode** when you have funded Chipnet WIFs and a configured Electrum server.
+Open the printed local URL. The app opens in Demo mode. Switch to **Mocknet setup** to test the complete local lifecycle.
 
-## How the license commitment works
+## Mocknet workflow
 
-CashToken NFT commitments are limited to 40 bytes. `src/lib/token.js` encodes this fixed 31-byte commitment:
+1. Create a local issuer identity and a local holder identity.
+2. Copy the holder identity into the **Holder identity** field in the issuer form.
+3. Click **Bootstrap mock authority**. This creates a simulated CashToken category and covenant address.
+4. Issue a license. Mocknet gives the transaction a simulated transaction ID and creates a 31-byte license commitment.
+5. Renew the license using the same local holder identity. This consumes the old simulated NFT and creates a replacement with a later expiry.
+6. Revoke the license as the issuer. This marks the simulated NFT as burned.
+7. Verify by license ID, commitment, or holder identity.
+
+Mocknet state is browser-only. Refreshing the page clears generated identities and the Mocknet bootstrap state; the display license list is retained in browser local storage until reset.
+
+## License commitment model
+
+The implementation preserves the CashToken NFT commitment shape: a fixed 31-byte record containing a version, active state, holder hash, expiry, license type, and random license ID nonce.
 
 | Bytes | Value |
 | --- | --- |
-| 0 | format version (`01`) |
-| 1 | state (`01` active) |
-| 2–21 | holder public-key hash (20 bytes) |
-| 22–25 | expiry Unix timestamp (4-byte big endian) |
-| 26 | license-type code |
-| 27–30 | license ID nonce |
+| 0 | Format version (`01`) |
+| 1 | State (`01` active) |
+| 2–21 | Holder identity hash (20 bytes) |
+| 22–25 | Expiry timestamp (4 bytes) |
+| 26 | License-type code |
+| 27–30 | License ID nonce |
 
 The readable title and type name are presentation data, indexed locally by the app. They are not an authorization input. Ownership and expiry are committed in the NFT itself.
 
@@ -57,3 +71,4 @@ The minting authority does not represent a license and should not be displayed a
 - The app’s license list and explicit `Revoked` label are local browser indexes. A separate verifier can independently prove an active, unexpired NFT by querying the contract address, but needs an issuer-published revocation index to label a deliberately burned NFT as revoked rather than simply absent.
 - This sample uses fixed transaction positions for clarity. It is audited educational code, not production-grade custody software.
 - The contract artifact is generated locally into `src/contracts/License.json` and is intentionally not committed.
+>>>>>>>>> Temporary merge branch 2

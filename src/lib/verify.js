@@ -1,8 +1,13 @@
 import { binToHex, decodeCashAddress } from '@bitauth/libauth';
 import { decodeLicenseCommitment } from './token';
-import { isLicenseUtxo } from './contract';
 
 export const STATUS = Object.freeze({ VALID: 'Valid', EXPIRED: 'Expired', REVOKED: 'Revoked', INVALID: 'Invalid' });
+
+function isLicenseUtxo(utxo, category, commitment) {
+  return utxo.token?.category === category
+    && utxo.token?.nft?.capability === 'none'
+    && (!commitment || utxo.token.nft.commitment === commitment);
+}
 
 function hashFromCashAddress(address) {
   const decoded = decodeCashAddress(address.trim());
@@ -43,7 +48,7 @@ export async function verifyLicense({ contract, category, query, claimedOwnerAdd
   return { status: STATUS.VALID, license, reason: 'Active covenant NFT, owner binding, and expiry all check out.' };
 }
 
-/** Local-only demo equivalent used while there is no Chipnet contract configured. */
+/** Local-only demo equivalent used while there is no blockchain contract configured. */
 export function verifyDemoLicense({ query, claimedOwnerAddress, licenses }) {
   const normalized = query.trim().toLowerCase();
   const license = licenses.find((item) => item.id.toLowerCase() === normalized || item.holderAddress.toLowerCase() === normalized);
