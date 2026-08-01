@@ -22,7 +22,7 @@ const licenseSchema = new mongoose.Schema(
 
     licenseType: {
       type: String,
-      enum: ["DRIVER", "PRC", "CSC"],
+      enum: ["DRIVER", "PRC", "BUSINESS"],
       required: true,
     },
 
@@ -42,17 +42,17 @@ const licenseSchema = new mongoose.Schema(
 
     nftTokenId: {
       type: String,
-      default: "",
+      required: true,
     },
 
     blockchainTxId: {
       type: String,
-      default: "",
+      required: true,
     },
 
     metadataURI: {
       type: String,
-      default: "",
+      required: true,
     },
   },
   {
