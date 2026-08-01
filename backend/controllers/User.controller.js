@@ -47,13 +47,11 @@ export const register = async (req, res) => {
         // Sanitize response
         const userObj = newUser.toObject();
         delete userObj.password;
-        delete userObj.resetPasswordToken;
-        delete userObj.resetPasswordExpiresAt;
 
 
         return res.status(201).json({
             success: true,
-            message: "Registration successful. Check your email to verify your account.",
+            message: "Registration successful.",
             user: userObj
         });
 
@@ -122,53 +120,6 @@ export const logout = async (req, res) => {
         });
 };
 
-export const verifyEmail = async (req, res) => {
-    const { code } = req.body;
-    try {
-        const user = await User.findOne( {
-            verificationToken: code,
-            verificationTokenExpiresAt: { $gt: Date.now() }
-        });
-
-        if(!user) {
-            return res.status(400).json({ success: false, message: "Invalid or Expired Verification Code" });
-        }
-
-        user.isVerified = true;
-        user.verificationToken = undefined;
-        user.verificationTokenExpiresAt = undefined;
-
-        await user.save();
-
-        
-        const PaymentService_BaseURL = process.env.PaymentService_BaseURL || "http://localhost";
-        // Communicate with Payment service to create a cart for the new user
-        try {
-            const paymentRes = await axios.post(`${PaymentService_BaseURL}/api/payment/create-new-cart/${user._id}`);
-            console.log(`Payment service responded with status: ${paymentRes.status}`);
-        } catch (error) {
-            console.error("Error communicating with Payment service:", err.message);
-        }
-
-        await sendWelcomeEmail(user.email, user.username);
-        res.status(200).json({
-            success: true,
-            message: "Email verified sucessfully",
-            user: {
-                ...user._doc,
-                password: undefined,
-                passwordResetToken: undefined,
-                passwordResetExpiresAt: undefined,
-                verificationToken: undefined,
-                verificationTokenExpiresAt: undefined,
-            }
-        });
-    } catch (error) {
-        console.error("Error in verifying Email:", err);
-        return res.status(500).json({ message: "Internal server error" });
-    }
-};
-
 export const getUserById = async (req, res) => {
     try {
         const userId = req.params.userId;
@@ -187,10 +138,6 @@ export const getUserById = async (req, res) => {
             user: {
                 ...user._doc,
                 password: undefined,
-                passwordResetToken: undefined,
-                passwordResetExpiresAt: undefined,
-                verificationToken: undefined,
-                verificationTokenExpiresAt: undefined,
             },
         });
     } catch (error) {
@@ -200,128 +147,3 @@ export const getUserById = async (req, res) => {
         });
     }
 }
-
-export const forgotPassword = async (req, res) => {
-    const { email } = req.body;
-    try {
-        const user = await User.findOne({ email });
-        if(!user) {
-            return res.status(400).json({ success: false, message: "User with this email does not exist" });
-        }
-        // Generate reset token
-        const resetToken = crypto.randomBytes(20).toString("hex");
-        const resetTokenExpiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
-        user.resetPasswordToken = resetToken;
-        user.resetPasswordExpiresAt = resetTokenExpiresAt;
-        await user.save();  
-
-        //send reset password email
-        const resetUrl = `${process.env.FRONTEND_BASE_URL}/reset-password/${resetToken}`;
-        
-        await sendResetPasswordEmail(user.email, resetUrl);
-
-        res.status(200).json({
-            success: true,
-            message: "Password reset email sent. Please check your inbox."
-        });
-    } catch (error) {
-        res.status(500).json({ message: "Internal server error" });
-    }
-}
-
-export const resetPassword = async (req, res) => {
-    const { token } = req.params;
-    const { password } = req.body;
-
-    try {
-        const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpiresAt: { $gt: Date.now() }
-        });
-
-        if(!user) {
-            return res.status(400).json({ success: false, message: "Invalid or Expired Password Reset Token" });
-        }
-
-        //update password
-        const hashedPassword = await bcrypt.hash(password, 10);
-        user.password = hashedPassword;
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpiresAt = undefined;
-        await user.save();
-
-        //send reset confirmation email
-        await sendResetSuccessEmail(user.email);
-
-        res.status(200).json({
-            success: true,
-            message: "Password reset successful. You can now log in with your new password."
-        });
-    } catch (error) {
-        console.error("Error in resetting password:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-}
-
-//update user profile with username email address{street, city, state, postalCode, country} and profileImage{url, public_id}
-export const updateProfile = async (req, res) => {
-    try {
-        const updates = req.body || {};
-        const token = req.cookies.token;
-
-        if (!token) return res.status(401).json({ loggedIn: false });
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
-
-        const setUpdates = {};
-
-        // Top-level field
-        if (updates.username !== undefined) setUpdates["username"] = updates.username;
-
-        // Nested address fields
-        if (updates.address) {
-            for (const key of ["street", "city", "state", "postalCode", "country"]) {
-                if (updates.address[key] !== undefined) {
-                    setUpdates[`address.${key}`] = updates.address[key];
-                }
-            }
-        }
-
-        // Nested profileImage fields
-        if (updates.profileImage) {
-            for (const key of ["url", "public_id"]) {
-                if (updates.profileImage[key] !== undefined) {
-                    setUpdates[`profileImage.${key}`] = updates.profileImage[key];
-                }
-            }
-        }
-
-        const user = await User.findOneAndUpdate(
-            { _id: userId },
-            { $set: setUpdates },
-            { new: true, runValidators: true }
-        );
-
-        if (!user) {
-            return res.status(400).json({ success: false, message: "User Not Found" });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: "Profile Updated Successfully",
-            user: {
-                ...user._doc,
-                password: undefined,
-                passwordResetToken: undefined,
-                passwordResetExpiresAt: undefined,
-                verificationToken: undefined,
-                verificationTokenExpiresAt: undefined,
-            },
-        });
-
-    } catch (error) {
-        console.error("Error in updating profile:", error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
-    }
-};
