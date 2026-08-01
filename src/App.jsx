@@ -24,6 +24,15 @@ export default function App() {
   useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(licenses)), [licenses]);
   const run = async (work) => { setBusy(true); try { await work(); } catch (error) { setNotice(error.message || 'The transaction could not be completed.'); } finally { setBusy(false); } };
   function issue(form) { run(async () => {
+    const holderIdentity = form.holderAddress.trim().toLowerCase();
+    const duplicate = licenses.find((license) =>
+      license.status !== 'Revoked'
+      && license.holderAddress.trim().toLowerCase() === holderIdentity
+      && license.licenseType === form.licenseType,
+    );
+    if (duplicate) {
+      throw new Error(`${form.holderName} already has an active ${form.licenseType} (${duplicate.id}). Revoke it before issuing a replacement.`);
+    }
     if (mode === 'mocknet') {
       if (!mocknet.category || !mocknet.issuer) throw new Error('Create an issuer identity and bootstrap Mocknet before issuing.');
       const nonce = randomLicenseNonce();
