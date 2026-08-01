@@ -1,0 +1,23 @@
+{
+  "name": "bch-soulbound-license",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --force",
+    "build": "vite build",
+    "preview": "vite preview",
+    "compile": "node scripts/compile.js"
+  },
+  "dependencies": {
+    "@bitauth/libauth": "^3.0.0",
+    "@cashscript/utils": "^0.8.0",
+    "cashscript": "^0.13.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "cashc": "^0.13.2",
+    "vite": "^5.4.0"
+  }
+}
