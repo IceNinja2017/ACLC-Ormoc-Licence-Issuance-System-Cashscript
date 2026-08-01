@@ -1,8 +1,4 @@
-# ProofPass: BCH Soulbound License MVP
-
-ProofPass is a beginner-friendly, browser-only demo of professional licenses on Bitcoin Cash. Each active license is an **immutable CashToken NFT** held in a CashScript covenant. The covenant only permits issue, renew, and revoke transactions; it never permits a wallet-to-wallet transfer.
-
-> Hackathon scope: this project is deliberately small and uses browser `localStorage` as its optional display index. The chain and contract are the source of truth for the current NFT UTXO. Never use a demo wallet or private key with real funds.
+# ACLC-Ormoc License Issuance System
 
 ## Quick start
 
