@@ -11,6 +11,7 @@ export const createApplication = async (req, res) => {
       address,
       contactNumber,
       details,
+      applicationType
     } = req.body;
 
     // Check if applicant already has a pending application
@@ -34,6 +35,7 @@ export const createApplication = async (req, res) => {
       address,
       contactNumber,
       details,
+      applicationType,
     });
 
     res.status(201).json({
@@ -52,7 +54,7 @@ export const createApplication = async (req, res) => {
 export const getAllApplications = async (req, res) => {
   try {
     const applications = await Application.find()
-      .populate("applicant", "name email walletAddress");
+      .populate("applicant", "name email walletAddress applicationType");
 
     res.status(200).json({
       success: true,

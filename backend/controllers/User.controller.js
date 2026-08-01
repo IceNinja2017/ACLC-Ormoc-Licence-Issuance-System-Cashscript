@@ -11,11 +11,11 @@ env.config();
 
 export const register = async (req, res) => {
     try {
-        const { username, email, password, address, walletAddress, role } = req.body;
+        const { username, email, password, walletAddress, role } = req.body;
 
         // required field checks
-        if (!username || !email || !password || !address || walletAddress === undefined) {
-            return res.status(400).json({ message: "username, email, password, address, walletAddress are required" });
+        if (!username || !email || !password || walletAddress === undefined) {
+            return res.status(400).json({ message: "username, email, password, walletAddress are required" });
         }
 
         // Check duplicates
@@ -42,7 +42,6 @@ export const register = async (req, res) => {
             username,
             email: email.toLowerCase(),
             password: hashedPassword,
-            address,
             walletAddress,
             tokenAddress,
         });

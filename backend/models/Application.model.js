@@ -8,6 +8,12 @@ const applicationSchema = new mongoose.Schema(
       required: true,
     },
 
+    applicationType: {
+      type: String,
+      enum: ["NEW", "RENEWAL"],
+      required: true,
+    },
+
     licenseType: {
       type: String,
       enum: ["DRIVER", "PRC", "BUSINESS"],
