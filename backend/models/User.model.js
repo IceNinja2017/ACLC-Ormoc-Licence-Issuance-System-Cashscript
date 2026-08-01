@@ -25,15 +25,6 @@ const userSchema = new mongoose.Schema(
       enum: ["ADMIN", "USER"],
       default: "USER",
     },
-
-    walletAddress: {
-      type: String,
-      required: true,
-    },
-    tokenAddress: {
-      type: String,
-      required: true,
-    },
   },
   {
     timestamps: true,

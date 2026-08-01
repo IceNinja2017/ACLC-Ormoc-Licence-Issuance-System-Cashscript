@@ -14,8 +14,8 @@ export const register = async (req, res) => {
         const { username, email, password, walletAddress, role } = req.body;
 
         // required field checks
-        if (!username || !email || !password || walletAddress === undefined) {
-            return res.status(400).json({ message: "username, email, password, walletAddress are required" });
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: "username, email, password are required" });
         }
 
         // Check duplicates
@@ -32,18 +32,11 @@ export const register = async (req, res) => {
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        
-        //Get TokenAddress from walletAddress
-        const converted = await convertToTokenAddress(walletAddress);
-        const tokenAddress = typeof converted === 'object' ? converted.address : converted;
-
         // Only create and save user after email succeeds
         const newUser = new User({
             username,
             email: email.toLowerCase(),
             password: hashedPassword,
-            walletAddress,
-            tokenAddress,
         });
 
         await newUser.save();
