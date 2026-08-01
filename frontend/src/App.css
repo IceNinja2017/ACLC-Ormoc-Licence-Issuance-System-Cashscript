@@ -294,3 +294,45 @@
     background:#fff;
     color:#111827;
 }
+
+.table-wrapper {
+  overflow-x: auto;
+  margin-top: 2rem;
+}
+
+
+.application-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+
+.application-table th {
+  text-align: left;
+  padding: 1rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+
+.application-table td {
+  padding: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+
+.application-table tr:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+
+.status-pill {
+  display: inline-flex;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(80,220,170,0.15);
+  font-size: 0.8rem;
+  font-weight: 600;
+}

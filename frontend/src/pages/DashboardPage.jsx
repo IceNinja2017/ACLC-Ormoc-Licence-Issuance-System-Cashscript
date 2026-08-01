@@ -45,13 +45,25 @@ export default function Dashboard() {
         </a>
 
         <div className="nav-actions">
-          <button
+
+        {user?.role === "USER" && (
+            <button
+            className="quiet nav-auth"
+            type="button"
+            onClick={() => navigate("/applications")}
+            >
+            My Applications
+            </button>
+        )}
+
+        <button
             className="quiet nav-auth"
             type="button"
             onClick={signOut}
-          >
+        >
             Sign Out
-          </button>
+        </button>
+
         </div>
       </nav>
 
