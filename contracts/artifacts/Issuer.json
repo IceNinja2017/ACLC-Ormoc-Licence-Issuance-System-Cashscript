@@ -1,0 +1,43 @@
+{
+  "contractName": "Issuer",
+  "constructorInputs": [
+    { "name": "adminPk", "type": "pubkey" }
+  ],
+  "abi": [
+    {
+      "name": "issue",
+      "inputs": [
+        { "name": "adminSig", "type": "sig" },
+        { "name": "vaultLockingBytecode", "type": "bytes" },
+        { "name": "commitment", "type": "bytes40" }
+      ]
+    }
+  ],
+  "bytecode": "OP_3 OP_ROLL OP_SIZE 28 OP_EQUALVERIFY OP_ROT OP_ROT OP_CHECKSIGVERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENAMOUNT OP_0 OP_UTXOTOKENAMOUNT OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_1 OP_OUTPUTTOKENCATEGORY OP_SWAP OP_1 OP_CAT OP_EQUALVERIFY OP_1 OP_OUTPUTTOKENCOMMITMENT OP_EQUALVERIFY OP_1 OP_OUTPUTBYTECODE OP_EQUAL",
+  "source": "pragma cashscript ^0.13.0;\n\n// Holds the mutable minting-capability NFT for this authority's license\n// category. Every issue() call is signed live by the admin's own connected\n// wallet (PLAYBOOK.md §1, \"no server-held key anywhere in this system\") —\n// there is no automatic/queued issuance.\ncontract Issuer(pubkey adminPk) {\n    function issue(sig adminSig, bytes vaultLockingBytecode, bytes40 commitment) {\n        require(checkSig(adminSig, adminPk));\n\n        // Output 0: recreate the minting-capability token identically, so\n        // this authority can keep issuing licenses after this transaction.\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount);\n\n        // Output 1: the newly issued license — a MUTABLE NFT (capability\n        // 0x01) carrying the 40-byte commitment, sent to the LicenseVault\n        // covenant address. Mutable at the token level because renew() and\n        // transfer() legitimately change the commitment later; safe because\n        // it will only ever live at the vault's covenant address, never in a\n        // plain wallet (see LicenseVault.cash and PLAYBOOK.md Appendix B).\n        bytes categoryId = tx.inputs[0].tokenCategory.split(32)[0];\n        require(tx.outputs[1].tokenCategory == categoryId + 0x01);\n        require(tx.outputs[1].nftCommitment == commitment);\n        require(tx.outputs[1].lockingBytecode == vaultLockingBytecode);\n    }\n}\n",
+  "fingerprint": "5ee14f89e13641099e9053f892c3ba052bd40e3265d1fe29dec37aaf699701c3",
+  "debug": {
+    "bytecode": "537a820128887b7bad00cd00c78800d100ce8800d300d09d00ce01207f7551d17c517e8851d28851cd87",
+    "sourceMap": "8:61:8:79;;;;;9:25:9:33;:35::42;:8::45:1;13:27:13:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;14:27:14:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;15:27:15:28:0;:16::41:1;:55::56:0;:45::69:1;:8::71;23:37:23:38:0;:27::53:1;:60::62:0;:27::63:1;:::66;24::24:28:0;:16::43:1;:47::57:0;:60::64;:47:::1;:8::66;25:27:25:28:0;:16::43:1;:8::59;26:27:26:28:0;:16::45:1;:8::71",
+    "logs": [],
+    "requires": [
+      { "ip": 8, "line": 9 },
+      { "ip": 13, "line": 13 },
+      { "ip": 18, "line": 14 },
+      { "ip": 23, "line": 15 },
+      { "ip": 34, "line": 24 },
+      { "ip": 37, "line": 25 },
+      { "ip": 41, "line": 26 }
+    ],
+    "sourceTags": "0:4:pv"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.13.2",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-08-01T06:29:18.008Z"
+}

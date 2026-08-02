@@ -1,0 +1,28 @@
+pragma cashscript ^0.13.0;
+
+// Holds the mutable minting-capability NFT for this authority's license
+// category. Every issue() call is signed live by the admin's own connected
+// wallet (PLAYBOOK.md §1, "no server-held key anywhere in this system") —
+// there is no automatic/queued issuance.
+contract Issuer(pubkey adminPk) {
+    function issue(sig adminSig, bytes vaultLockingBytecode, bytes40 commitment) {
+        require(checkSig(adminSig, adminPk));
+
+        // Output 0: recreate the minting-capability token identically, so
+        // this authority can keep issuing licenses after this transaction.
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount);
+
+        // Output 1: the newly issued license — a MUTABLE NFT (capability
+        // 0x01) carrying the 40-byte commitment, sent to the LicenseVault
+        // covenant address. Mutable at the token level because renew() and
+        // transfer() legitimately change the commitment later; safe because
+        // it will only ever live at the vault's covenant address, never in a
+        // plain wallet (see LicenseVault.cash and PLAYBOOK.md Appendix B).
+        bytes categoryId = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[1].tokenCategory == categoryId + 0x01);
+        require(tx.outputs[1].nftCommitment == commitment);
+        require(tx.outputs[1].lockingBytecode == vaultLockingBytecode);
+    }
+}

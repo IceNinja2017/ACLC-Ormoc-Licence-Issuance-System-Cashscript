@@ -1,37 +1,37 @@
 import express from "express";
+
 import {
   createApplication,
   getAllApplications,
   getApplicationById,
   approveApplication,
   rejectApplication,
+  updatePaymentStatus,
   deleteApplication,
 } from "../controllers/Application.controller.js";
-import { mintApplicationNFT } from "../controllers/Nft.controller.js";
+
+import {
+  recordMint,
+  getNFTByApplication,
+} from "../controllers/Nft.controller.js";
 
 const router = express.Router();
 
-// Create a new application
+// Create
 router.post("/:applicant", createApplication);
 
-// Get all applications
+// Read
 router.get("/", getAllApplications);
-
-// Get a specific application
 router.get("/:id", getApplicationById);
+router.get("/:id/nft", getNFTByApplication);
 
-// Approve an application
+// Application workflow
 router.put("/:id/approve", approveApplication);
-
-// Reject an application
 router.put("/:id/reject", rejectApplication);
+router.put("/:id/payment", updatePaymentStatus);
+router.put("/:id/minted", recordMint);
 
-// Delete an application
+// Delete
 router.delete("/:id", deleteApplication);
-
-router.post(
- "/:id/mint",
- mintApplicationNFT
-);
 
 export default router;

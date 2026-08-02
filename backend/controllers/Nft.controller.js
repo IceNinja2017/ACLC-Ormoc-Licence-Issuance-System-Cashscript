@@ -1,138 +1,107 @@
 import Application from "../models/Application.model.js";
-// import your CashScript mint function later
-// import { mintNFT } from "../services/cashscript.service.js";
 
+export const recordMint = async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
 
-export const mintApplicationNFT = async (req, res) => {
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found.",
+      });
+    }
 
-try {
+    if (application.status !== "APPROVED") {
+      return res.status(400).json({
+        success: false,
+        message: "Application is not approved.",
+      });
+    }
 
-const application = await Application.findById(
-  req.params.id
-);
+    if (application.paymentStatus !== "PAID") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment has not been verified.",
+      });
+    }
 
+    if (application.nft?.mintTransactionId) {
+      return res.status(400).json({
+        success: false,
+        message: "NFT has already been recorded.",
+      });
+    }
 
-if (!application) {
-  return res.status(404).json({
-    success:false,
-    message:"Application not found."
-  });
-}
+    const {
+      mintTransactionId,
+      tokenCategory,
+      commitment,
+      serial,
+    } = req.body;
 
+    if (
+      !mintTransactionId ||
+      !tokenCategory ||
+      !commitment ||
+      serial === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing NFT information.",
+      });
+    }
 
-// Payment check
-if (application.paymentStatus !== "PAID") {
+    application.status = "MINTED";
 
-  return res.status(400).json({
-    success:false,
-    message:"Payment has not been verified."
-  });
+    application.nft = {
+      mintTransactionId,
+      tokenCategory,
+      commitment,
+      serial,
+      mintedAt: new Date(),
+    };
 
-}
+    await application.save();
 
-
-// Prevent duplicate minting
-if (application.status === "MINTED") {
-
-  return res.status(400).json({
-    success:false,
-    message:"NFT already minted."
-  });
-
-}
-
-
-// --------------------------
-// NFT METADATA
-// --------------------------
-
-const metadata = {
-
-  name:
-    `${application.licenseType} License`,
-
-  description:
-    "ProofPass blockchain license",
-
-  applicant:
-    application.fullName,
-
-  licenseType:
-    application.licenseType,
-
-  applicationId:
-    application._id,
-
-  issuedAt:
-    new Date(),
-
+    return res.status(200).json({
+      success: true,
+      message: "NFT recorded successfully.",
+      data: application,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
+export const getNFTByApplication = async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
 
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found.",
+      });
+    }
 
-// --------------------------
-// CASHCRIPT MINT HERE
-// --------------------------
+    if (!application.nft) {
+      return res.status(404).json({
+        success: false,
+        message: "NFT has not been minted yet.",
+      });
+    }
 
-
-// const mintResult = await mintNFT(metadata);
-
-
-// temporary hackathon response
-const mintResult = {
-
-  tokenId:
-    "NFT-" + Date.now(),
-
-  transactionId:
-    "BCH-MINT-TX",
-
-};
-
-
-
-// Save NFT data
-
-application.status = "MINTED";
-
-
-application.nft = {
-
-  tokenId:
-    mintResult.tokenId,
-
-  transactionId:
-    mintResult.transactionId,
-
-  mintedAt:
-    new Date(),
-
-};
-
-
-await application.save();
-
-
-
-res.status(200).json({
-
-success:true,
-
-message:"NFT minted successfully.",
-
-data:application,
-
-});
-
-
-}
-catch(error){
-
-res.status(500).json({
-success:false,
-message:error.message,
-});
-
-}
-
+    return res.status(200).json({
+      success: true,
+      data: application.nft,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };

@@ -1,0 +1,102 @@
+pragma cashscript ^0.13.0;
+
+// Holds an issued license as a MUTABLE NFT (CashTokens capability 0x01) —
+// mutable at the token level because renew()/transfer() legitimately need to
+// change the commitment (expiry, holderPkh). What stops that mutability from
+// being a vulnerability is that the token never sits in a plain wallet: it
+// lives at this covenant's address, and only the three functions below may
+// ever spend it, each constraining exactly which bytes are allowed to change
+// (see Appendix B in PLAYBOOK.md — this is the "mutable NFT in a covenant,
+// not a wallet" design decision, made concrete). The 40-byte commitment
+// layout is fixed in PLAYBOOK.md §1 "Revised commitment layout":
+//
+//   [0..4)   serial      uint32 LE
+//   [4..24)  holderPkh   hash160
+//   [24..28) expiry      uint32 LE (block height)
+//   [28]     classId     uint8
+//   [29]     flags       uint8   (bit0 = suspended)
+//   [30..40) nameTag     10 bytes
+//
+// PLAYBOOK.md §1 "Who signs what": renew() needs no signature at all —
+// pay the fee, the math does the rest. transfer() needs the current
+// holder's signature, because "transferred" has to mean they said yes.
+// revoke() needs the admin's live signature. There is no server-held key
+// anywhere in this system.
+contract LicenseVault(
+    pubkey adminPk,
+    bytes treasuryLockingBytecode,
+    int renewalFeeSats,
+    int termLengthBlocks
+) {
+    // Permissionless: anyone who pays the fee can trigger this. The contract
+    // does not check identity because the only thing it's allowed to change
+    // is the expiry, advanced by a fixed term — never an arbitrary value the
+    // caller supplies. This is what makes "no signature required" safe.
+    function renew() {
+        bytes commitment = tx.inputs[this.activeInputIndex].nftCommitment;
+
+        bytes serialBytes, bytes afterSerial = commitment.split(4);
+        bytes holderPkh, bytes afterHolder = afterSerial.split(20);
+        bytes oldExpiryBytes, bytes tail = afterHolder.split(4);
+        // tail is now classId(1) + flags(1) + nameTag(10) = 12 bytes, carried
+        // forward unchanged.
+
+        int oldExpiry = int(oldExpiryBytes);
+        int newExpiry = oldExpiry + termLengthBlocks;
+        bytes newExpiryBytes = toPaddedBytes(newExpiry, 4);
+
+        bytes newCommitment = serialBytes + holderPkh + newExpiryBytes + tail;
+
+        require(
+            tx.outputs[0].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode
+        );
+        require(
+            tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory
+        );
+        require(tx.outputs[0].nftCommitment == newCommitment);
+
+        // Fee goes to the treasury. This is the only "authorization" renew()
+        // has, and it's an amount check, not an identity check.
+        require(tx.outputs[1].lockingBytecode == treasuryLockingBytecode);
+        require(tx.outputs[1].value >= renewalFeeSats);
+    }
+
+    // One-shot, holder-authorized. Only holderPkh may change; every other
+    // field must be byte-identical, so a transfer can move who controls the
+    // license but can never smuggle in a changed expiry, class, or flags.
+    function transfer(pubkey currentHolderPk, sig currentHolderSig, bytes20 newHolderPkh) {
+        bytes commitment = tx.inputs[this.activeInputIndex].nftCommitment;
+
+        bytes serialBytes, bytes afterSerial = commitment.split(4);
+        bytes holderPkh, bytes tail = afterSerial.split(20);
+        // tail is expiry(4) + classId(1) + flags(1) + nameTag(10) = 16 bytes,
+        // carried forward unchanged.
+
+        // Proves the signer is the CURRENT holder, not the new one — you
+        // cannot transfer a license you don't already control.
+        require(hash160(currentHolderPk) == holderPkh);
+        require(checkSig(currentHolderSig, currentHolderPk));
+
+        bytes newCommitment = serialBytes + newHolderPkh + tail;
+
+        require(
+            tx.outputs[0].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode
+        );
+        require(
+            tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory
+        );
+        require(tx.outputs[0].nftCommitment == newCommitment);
+    }
+
+    // Admin-signed burn. No server-held key: the admin's own connected
+    // wallet must sign this live, each time (PLAYBOOK.md §1).
+    function revoke(sig adminSig) {
+        require(checkSig(adminSig, adminPk));
+
+        // The license's token category must not be recreated at output 0 —
+        // that's what makes this a burn rather than a transfer to nowhere.
+        require(
+            tx.outputs[0].tokenCategory != tx.inputs[this.activeInputIndex].tokenCategory
+        );
+    }
+}
