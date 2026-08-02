@@ -1,149 +1,120 @@
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
-import { User } from "../models/User.model.js";
+import User from "../models/User.model.js";
 import { generateTokenAndSetCookie } from "../middleware/generateTokenAndSetCookie.js";
-import axios from "axios";
-import jwt from "jsonwebtoken";
 import env from "dotenv";
+
 env.config();
 
 export const register = async (req, res) => {
-    try {
-        const { username, email, password, address, walletAddress } = req.body;
+  try {
+    const { username, email, password } = req.body;
 
-        // required field checks
-        if (!username || !email || !password || !address || walletAddress === undefined) {
-            return res.status(400).json({ message: "username, email, password, address, and walletAddress are required" });
-        }
-
-        // Check duplicates
-        const existing = await User.findOne({
-            $or: [{ email: email.toLowerCase() }, { username }]
-        });
-        if (existing) {
-            if (existing.email === email.toLowerCase()) {
-                return res.status(409).json({ message: "Email already in use" });
-            }
-            return res.status(409).json({ message: "Username already in use" });
-        }
-
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Only create and save user after email succeeds
-        const newUser = new User({
-            username,
-            email: email.toLowerCase(),
-            password: hashedPassword,
-            address,
-            walletAddress,
-        });
-
-        await newUser.save();
-
-        // JWT token
-        generateTokenAndSetCookie(res, newUser._id);
-
-        // Sanitize response
-        const userObj = newUser.toObject();
-        delete userObj.password;
-
-
-        return res.status(201).json({
-            success: true,
-            message: "Registration successful.",
-            user: userObj
-        });
-
-    } catch (err) {
-        if (err?.code === 11000) {
-            const dupKey = Object.keys(err.keyPattern || {}).join(", ");
-            return res.status(409).json({ message: `Duplicate key: ${dupKey}` });
-        }
-        console.error("Register error:", err);
-        return res.status(500).json({ message: "Internal server error" });
+    if (!username || !email || !password) {
+      return res.status(400).json({ success: false, message: "username, email, and password are required." });
     }
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: "Password must be at least 8 characters." });
+    }
+
+    const existing = await User.findOne({
+      $or: [{ email: email.toLowerCase() }, { username }],
+    });
+    if (existing) {
+      if (existing.email === email.toLowerCase()) {
+        return res.status(409).json({ success: false, message: "Email already in use" });
+      }
+      return res.status(409).json({ success: false, message: "Username already in use" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const isAdmin = email.toLowerCase() === process.env.ADMIN_EMAIL?.toLowerCase();
+
+    const newUser = new User({
+      username,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      role: isAdmin ? "ADMIN" : "USER",
+    });
+
+    await newUser.save();
+    generateTokenAndSetCookie(res, newUser._id);
+
+    const userObj = newUser.toObject();
+    delete userObj.password;
+
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful.",
+      user: userObj,
+    });
+  } catch (err) {
+    if (err?.code === 11000) {
+      const dupKey = Object.keys(err.keyPattern || {}).join(", ");
+      return res.status(409).json({ success: false, message: `Duplicate key: ${dupKey}` });
+    }
+    console.error("Register error:", err);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
 };
 
 export const login = async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    try {
-        const user = await User.findOne({ email });
-        if(!user){
-            return res.status(400).json({
-                success: false,
-                message: "Invalid Credentials"
-            });
-        }
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: "Email and password are required." });
+  }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if(!isPasswordValid){
-            return res.status(400).json({
-                success: false,
-                message: "Invalid Credentials"
-            });
-        }
-
-        generateTokenAndSetCookie(res, user._id);
-
-        user.lastLogin = new Date();
-        await user.save();
-
-        res.status(200).json({
-                success: true,
-                message: "Logged in Sucessfully",
-                user: {
-                    ...user._doc,
-                    password: undefined,
-                    passwordResetToken: undefined,
-                    passwordResetExpiresAt: undefined,
-                    verificationToken: undefined,
-                    verificationTokenExpiresAt: undefined,
-                },
-            });
-
-    } catch (error) {
-        console.log("Error in logging in", error);
-        res.status(400).json({
-                success: false,
-                message: error.message
-            });
+  try {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Invalid credentials" });
     }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ success: false, message: "Invalid credentials" });
+    }
+
+    generateTokenAndSetCookie(res, user._id);
+    await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
+
+    const userObj = user.toObject();
+    delete userObj.password;
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged in successfully",
+      user: userObj,
+    });
+  } catch (error) {
+    console.error("Error in logging in:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
 };
 
 export const logout = async (req, res) => {
-    res.clearCookie("token");
-    res.status(200).json({
-            success: true,
-            message: "Logged out sucessfully"
-        });
+  res.clearCookie("token");
+  res.status(200).json({ success: true, message: "Logged out successfully." });
+};
+
+export const getCurrentUser = async (req, res) => {
+  try {
+    const userObj = req.user.toObject();
+    delete userObj.__v;
+    res.status(200).json({ success: true, user: userObj });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 export const getUserById = async (req, res) => {
-    try {
-        const userId = req.params.userId;
-        const user = await User.findOne({ _id: userId });
-
-        if(!user) {
-            return res.status(400).json({
-                success: false,
-                message: "User Not Found",
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: "User Found!",
-            user: {
-                ...user._doc,
-                password: undefined,
-            },
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: true,
-            message: error.message,
-        });
+  try {
+    const user = await User.findOne({ _id: req.params.userId }).select("-password");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
     }
-}
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

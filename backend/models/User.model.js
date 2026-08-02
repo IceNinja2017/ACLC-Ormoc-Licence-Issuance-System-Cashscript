@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       required: true,
+      unique: true,
       trim: true,
     },
 
@@ -20,20 +21,22 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
-    address: {
+    // Optional — set when the user pays a fee on Chipnet, so the license can be
+    // tied to the wallet that paid. Not used for auth.
+    walletAddress: {
       type: String,
-      required: true,
+      default: "",
+      trim: true,
     },
 
     role: {
       type: String,
-      enum: ["ADMIN", "USER", "VERIFIER"],
+      enum: ["ADMIN", "USER"],
       default: "USER",
     },
 
-    walletAddress: {
-      type: String,
-      required: true,
+    lastLogin: {
+      type: Date,
     },
   },
   {

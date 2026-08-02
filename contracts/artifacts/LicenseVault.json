@@ -1,0 +1,121 @@
+{
+  "contractName": "LicenseVault",
+  "constructorInputs": [
+    {
+      "name": "adminPk",
+      "type": "pubkey"
+    },
+    {
+      "name": "treasuryLockingBytecode",
+      "type": "bytes"
+    },
+    {
+      "name": "renewalFeeSats",
+      "type": "int"
+    },
+    {
+      "name": "termLengthBlocks",
+      "type": "int"
+    }
+  ],
+  "abi": [
+    {
+      "name": "renew",
+      "inputs": []
+    },
+    {
+      "name": "transfer",
+      "inputs": [
+        {
+          "name": "currentHolderPk",
+          "type": "pubkey"
+        },
+        {
+          "name": "currentHolderSig",
+          "type": "sig"
+        },
+        {
+          "name": "newHolderPkh",
+          "type": "bytes20"
+        }
+      ]
+    },
+    {
+      "name": "revoke",
+      "inputs": [
+        {
+          "name": "adminSig",
+          "type": "sig"
+        }
+      ]
+    }
+  ],
+  "bytecode": "OP_4 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_UTXOTOKENCOMMITMENT OP_4 OP_SPLIT 14 OP_SPLIT OP_4 OP_SPLIT OP_SWAP OP_BIN2NUM OP_7 OP_ROLL OP_ADD OP_4 OP_NUM2BIN OP_2SWAP OP_CAT OP_SWAP OP_CAT OP_SWAP OP_CAT OP_0 OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_EQUALVERIFY OP_1 OP_OUTPUTBYTECODE OP_ROT OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_ROT OP_GREATERTHANOREQUAL OP_NIP OP_NIP OP_ELSE OP_4 OP_PICK OP_1 OP_NUMEQUAL OP_IF OP_7 OP_ROLL OP_SIZE 14 OP_EQUALVERIFY OP_INPUTINDEX OP_UTXOTOKENCOMMITMENT OP_4 OP_SPLIT 14 OP_SPLIT OP_9 OP_PICK OP_HASH160 OP_ROT OP_EQUALVERIFY OP_9 OP_ROLL OP_9 OP_ROLL OP_CHECKSIGVERIFY OP_SWAP OP_ROT OP_CAT OP_SWAP OP_CAT OP_0 OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_EQUALVERIFY OP_2DROP OP_2DROP OP_DROP OP_1 OP_ELSE OP_4 OP_ROLL OP_2 OP_NUMEQUALVERIFY OP_4 OP_ROLL OP_SWAP OP_CHECKSIGVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_INPUTINDEX OP_UTXOTOKENCATEGORY OP_EQUAL OP_NOT OP_NIP OP_NIP OP_NIP OP_ENDIF OP_ENDIF",
+  "source": "pragma cashscript ^0.13.0;\r\n\r\n// Holds an issued license as a MUTABLE NFT (CashTokens capability 0x01) —\r\n// mutable at the token level because renew()/transfer() legitimately need to\r\n// change the commitment (expiry, holderPkh). What stops that mutability from\r\n// being a vulnerability is that the token never sits in a plain wallet: it\r\n// lives at this covenant's address, and only the three functions below may\r\n// ever spend it, each constraining exactly which bytes are allowed to change\r\n// (see Appendix B in PLAYBOOK.md — this is the \"mutable NFT in a covenant,\r\n// not a wallet\" design decision, made concrete). The 40-byte commitment\r\n// layout is fixed in PLAYBOOK.md §1 \"Revised commitment layout\":\r\n//\r\n//   [0..4)   serial      uint32 LE\r\n//   [4..24)  holderPkh   hash160\r\n//   [24..28) expiry      uint32 LE (block height)\r\n//   [28]     classId     uint8\r\n//   [29]     flags       uint8   (bit0 = suspended)\r\n//   [30..40) nameTag     10 bytes\r\n//\r\n// PLAYBOOK.md §1 \"Who signs what\": renew() needs no signature at all —\r\n// pay the fee, the math does the rest. transfer() needs the current\r\n// holder's signature, because \"transferred\" has to mean they said yes.\r\n// revoke() needs the admin's live signature. There is no server-held key\r\n// anywhere in this system.\r\ncontract LicenseVault(\r\n    pubkey adminPk,\r\n    bytes treasuryLockingBytecode,\r\n    int renewalFeeSats,\r\n    int termLengthBlocks\r\n) {\r\n    // Permissionless: anyone who pays the fee can trigger this. The contract\r\n    // does not check identity because the only thing it's allowed to change\r\n    // is the expiry, advanced by a fixed term — never an arbitrary value the\r\n    // caller supplies. This is what makes \"no signature required\" safe.\r\n    function renew() {\r\n        bytes commitment = tx.inputs[this.activeInputIndex].nftCommitment;\r\n\r\n        bytes serialBytes, bytes afterSerial = commitment.split(4);\r\n        bytes holderPkh, bytes afterHolder = afterSerial.split(20);\r\n        bytes oldExpiryBytes, bytes tail = afterHolder.split(4);\r\n        // tail is now classId(1) + flags(1) + nameTag(10) = 12 bytes, carried\r\n        // forward unchanged.\r\n\r\n        int oldExpiry = int(oldExpiryBytes);\r\n        int newExpiry = oldExpiry + termLengthBlocks;\r\n        bytes newExpiryBytes = toPaddedBytes(newExpiry, 4);\r\n\r\n        bytes newCommitment = serialBytes + holderPkh + newExpiryBytes + tail;\r\n\r\n        require(\r\n            tx.outputs[0].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode\r\n        );\r\n        require(\r\n            tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory\r\n        );\r\n        require(tx.outputs[0].nftCommitment == newCommitment);\r\n\r\n        // Fee goes to the treasury. This is the only \"authorization\" renew()\r\n        // has, and it's an amount check, not an identity check.\r\n        require(tx.outputs[1].lockingBytecode == treasuryLockingBytecode);\r\n        require(tx.outputs[1].value >= renewalFeeSats);\r\n    }\r\n\r\n    // One-shot, holder-authorized. Only holderPkh may change; every other\r\n    // field must be byte-identical, so a transfer can move who controls the\r\n    // license but can never smuggle in a changed expiry, class, or flags.\r\n    function transfer(pubkey currentHolderPk, sig currentHolderSig, bytes20 newHolderPkh) {\r\n        bytes commitment = tx.inputs[this.activeInputIndex].nftCommitment;\r\n\r\n        bytes serialBytes, bytes afterSerial = commitment.split(4);\r\n        bytes holderPkh, bytes tail = afterSerial.split(20);\r\n        // tail is expiry(4) + classId(1) + flags(1) + nameTag(10) = 16 bytes,\r\n        // carried forward unchanged.\r\n\r\n        // Proves the signer is the CURRENT holder, not the new one — you\r\n        // cannot transfer a license you don't already control.\r\n        require(hash160(currentHolderPk) == holderPkh);\r\n        require(checkSig(currentHolderSig, currentHolderPk));\r\n\r\n        bytes newCommitment = serialBytes + newHolderPkh + tail;\r\n\r\n        require(\r\n            tx.outputs[0].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode\r\n        );\r\n        require(\r\n            tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory\r\n        );\r\n        require(tx.outputs[0].nftCommitment == newCommitment);\r\n    }\r\n\r\n    // Admin-signed burn. No server-held key: the admin's own connected\r\n    // wallet must sign this live, each time (PLAYBOOK.md §1).\r\n    function revoke(sig adminSig) {\r\n        require(checkSig(adminSig, adminPk));\r\n\r\n        // The license's token category must not be recreated at output 0 —\r\n        // that's what makes this a burn rather than a transfer to nowhere.\r\n        require(\r\n            tx.outputs[0].tokenCategory != tx.inputs[this.activeInputIndex].tokenCategory\r\n        );\r\n    }\r\n}\r\n",
+  "fingerprint": "dbc7d4f1ce4637716ab8b56c82e65cb6b88fa4648642218ef92980155fa5da04",
+  "debug": {
+    "bytecode": "5479009c63c0cf547f01147f547f7c81577a935480727e7c7e7c7e00cdc0c78800d1c0ce8800d28851cd7b8851cc7ba27777675479519c63577a82011488c0cf547f01147f5979a97b88597a597aad7c7b7e7c7e00cdc0c78800d1c0ce8800d2886d6d755167547a529d547a7cad00d1c0ce87917777776868",
+    "sourceMap": "35:4:62:5;;;;;36:37:36:58;:27::73:1;38:64:38:65:0;:47::66:1;39:63:39:65:0;:45::66:1;40:61:40:62:0;:43::63:1;44:28:44:42:0;:24::43:1;45:36:45:52:0;;:24:::1;46:56:46:57:0;:31::58:1;48:30:48:53:0;::::1;:56::70:0;:30:::1;:73::77:0;:30:::1;51:23:51:24:0;:12::41:1;:55::76:0;:45::93:1;50:8:52:10;54:23:54:24:0;:12::39:1;:53::74:0;:43::89:1;53:8:55:10;56:27:56:28:0;:16::43:1;:8::62;60:27:60:28:0;:16::45:1;:49::72:0;:8::74:1;61:27:61:28:0;:16::35:1;:39::53:0;:8::55:1;35:21:62:5;;:4;67::89::0;;;;;:68:67:88;;;;;68:37:68:58;:27::73:1;70:64:70:65:0;:47::66:1;71:56:71:58:0;:38::59:1;77:24:77:39:0;;:16::40:1;:44::53:0;:8::55:1;78:25:78:41:0;;:43::58;;:8::61:1;80:30:80:41:0;:44::56;:30:::1;:59::63:0;:30:::1;83:23:83:24:0;:12::41:1;:55::76:0;:45::93:1;82:8:84:10;86:23:86:24:0;:12::39:1;:53::74:0;:43::89:1;85:8:87:10;88:27:88:28:0;:16::43:1;:8::62;67:90:89:5;;;;:4;93::101::0;;;;94:25:94:33;;:35::42;:8::45:1;99:23:99:24:0;:12::39:1;:53::74:0;:43::89:1;:12;98:8:100:10;93:34:101:5;;;25:0:102:1;",
+    "logs": [],
+    "requires": [
+      {
+        "ip": 34,
+        "line": 50
+      },
+      {
+        "ip": 39,
+        "line": 53
+      },
+      {
+        "ip": 42,
+        "line": 56
+      },
+      {
+        "ip": 46,
+        "line": 60
+      },
+      {
+        "ip": 51,
+        "line": 61
+      },
+      {
+        "ip": 74,
+        "line": 77
+      },
+      {
+        "ip": 79,
+        "line": 78
+      },
+      {
+        "ip": 89,
+        "line": 82
+      },
+      {
+        "ip": 94,
+        "line": 85
+      },
+      {
+        "ip": 97,
+        "line": 88
+      },
+      {
+        "ip": 110,
+        "line": 94
+      },
+      {
+        "ip": 117,
+        "line": 98
+      }
+    ],
+    "sourceTags": "47:48:sc;55:59:pv;113:115:sc"
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.13.2",
+    "options": {
+      "enforceFunctionParameterTypes": true,
+      "enforceLocktimeGuard": true
+    }
+  },
+  "updatedAt": "2026-08-02T01:01:08.633Z"
+}

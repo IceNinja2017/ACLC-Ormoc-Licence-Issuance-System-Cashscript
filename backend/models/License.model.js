@@ -14,17 +14,28 @@ const licenseSchema = new mongoose.Schema(
       required: true,
     },
 
+    application: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Application",
+    },
+
+    holderPaymentAddress: { type: String, default: "" },
+    holderPkh: { type: String, default: "" },
+    holderName: { type: String, default: "" },
+    nameHash: { type: String, default: "" },
+
     issuer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
 
     licenseType: {
       type: String,
-      enum: ["DRIVER", "PRC", "CSC"],
+      enum: ["DRIVER", "PRC", "BUSINESS"],
       required: true,
     },
+
+    classId: { type: Number, default: 1 },
 
     status: {
       type: String,
@@ -32,28 +43,18 @@ const licenseSchema = new mongoose.Schema(
       default: "PENDING",
     },
 
-    issueDate: {
-      type: Date,
-    },
+    issueDate: { type: Date },
+    expiryBlock: { type: Number, default: 0 },
+    expiryDate: { type: Date },
 
-    expiryDate: {
-      type: Date,
-    },
-
-    nftTokenId: {
-      type: String,
-      default: "",
-    },
-
-    blockchainTxId: {
-      type: String,
-      default: "",
-    },
-
-    metadataURI: {
-      type: String,
-      default: "",
-    },
+    // On-chain CashToken identity
+    category: { type: String, default: "" },
+    commitment: { type: String, default: "" },
+    serial: { type: Number, default: 0 },
+    vaultAddress: { type: String, default: "" },
+    nftTokenId: { type: String, default: "" },
+    blockchainTxId: { type: String, default: "" },
+    metadataURI: { type: String, default: "" },
   },
   {
     timestamps: true,
